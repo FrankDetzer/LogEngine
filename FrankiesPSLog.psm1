@@ -18,7 +18,7 @@
                     FileLocation           = $FilePath + '\' + $FileName
                     OutputToFileEnabled    = $OutputToFileEnabled
                     OutputToConsoleEnabled = $OutputToConsoleEnabled
-                    OutputFileCreated      = $false
+                    # OutputFileCreated      = $false
                 }
             )
             Data = @()            
@@ -36,7 +36,7 @@
 
     end {
         $global:LogObject.Data | Out-LogEntry
-        $global:LogObject.Meta.OutputFileCreated = Test-Path $global:LogObject.Meta.FileLocation
+        # $global:LogObject.Meta.OutputFileCreated = Test-Path $global:LogObject.Meta.FileLocation
     }
 }
 
@@ -48,8 +48,6 @@ function New-LogEntry {
         [string]$Message,
         [validateset('Info', 'Warn', 'Error', 'Debug')]
         [string]$Level = 'Info',
-        # [bool]$LineConsoleOutputEnabled = $true,
-        # [bool]$LineFileOutputEnabled = $true,
         [validateset($null, '#', '+', '-')]
         [string]$Prefix = $null
 
@@ -58,6 +56,7 @@ function New-LogEntry {
     begin {
         if ($global:NewLogEntryTriggered -ne $true) {
             [uint]$global:LogIndexCounter = 1
+            $global:NewLogEntryTriggered = $true
         }
     }
 
@@ -69,37 +68,13 @@ function New-LogEntry {
                 'Prefix'    = $Prefix
                 'Level'     = $Level
                 'Message'   = $Message
-                # # 'OutputMessage' = (("{0:d5}" -f $global:LogIndexCounter) + ' ' + $Prefix + ' ' + $Message)
-                # 'LineConsoleOutputEnabled' = $LineConsoleOutputEnabled
-                # 'LineFileOutputEnabled'   = $LineFileOutputEnabled
             }
         )
     }
 
     end {
         $global:LogIndexCounter++
-
-        if ($global:NewLogEntryTriggered -ne $true) {
-            $global:NewLogEntryTriggered = $true
-        }
-
-        # $SanitisedEntry = $CurrentEntry | Select-Object -ExcludeProperty LineConsoleOutputEnabled, LineFileOutputEnabled
-
-        # # console output
-        # if ($global:LogObject.Meta.OutputToConsoleEnabled) {
-        #     if ($global:NewLogEntryTriggered -ne $true) {
-        #         $SanitisedEntry | Write-Output
-        #     }
-        #     $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Write-Output
-        # }
-        
-        # # file output
-        # if ($global:LogObject.Meta.OutputToFileEnabled) {
-        #     if ($global:NewLogEntryTriggered -ne $true) {
-        #         $SanitisedEntry | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8
-        #     }
-        #     $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8 -Append
-        # }
+        $CurrentEntry | Out-LogEntry
     }
 }
 
@@ -112,6 +87,7 @@ function Out-LogEntry {
 
     begin {
         $SanitisedEntry = $Content | Select-Object -ExcludeProperty LineConsoleOutputEnabled, LineFileOutputEnabled
+        $SanitisedString = ($SanitisedEntry | Format-Table -HideTableHeaders | Out-String).Trim()
     }
     
     process {
@@ -120,17 +96,15 @@ function Out-LogEntry {
             if ($global:OutLogEntryTriggered -ne $true) {
                 $SanitisedEntry | Write-Output
             }
-            $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Write-Output
+            $SanitisedString | Write-Output
         }
         
         # file output
         if ($global:LogObject.Meta.OutputToFileEnabled) {
-            # $OutputFile = New-Item -Path $global:LogObject.Meta.FilePath -Name $global:LogObject.Meta.FileName
-
             if ($global:OutLogEntryTriggered -ne $true) {
                 $SanitisedEntry | Out-File -Path $global:LogObject.Meta.FileLocation -Encoding utf8
             }
-            $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Out-File -Path $global:LogObject.Meta.FileLocation -Encoding utf8 -Append
+            $SanitisedString | Out-File -Path $global:LogObject.Meta.FileLocation -Encoding utf8 -Append
         }
     }
 
@@ -140,49 +114,3 @@ function Out-LogEntry {
         }
     }
 }
-
-
-# function Out-LogEntry {
-#     param (
-#         [parameter(ValueFromPipeline)]
-#         [pscustomobject]$Content
-#     )
-
-#     begin {
-#         $SanitisedContent = $Content | Select-Object -ExcludeProperty LineConsoleOutputEnabled, LineFileOutputEnabled
-
-#         if ($global:OutLogEntryTriggered -ne $true) {
-
-#             if ($global:LogObject.Meta.OutputToFileEnabled) {
-#                 $SanitisedContent | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8
-#             }
-
-#             $global:OutLogEntryTriggered = $true
-#         }
-
-#         if ($global:LogObject.Meta.)
-
-
-
-#         #     $OutputMessage = ($Content | Format-Table -HideTableHeaders | Out-String).Trim()
-#         # }
-    
-#         # process {
-#         #     Write-Information $OutputMessage
-#         #     Write-Verbose $OutputMessage
-
-#         #     switch ($Level) {
-#         #         'Info' { Write-Output $OutputMessage }
-#         #         'Warn' { Write-Warning $OutputMessage }
-#         #         'Error' { Write-Error $OutputMessage }
-#         #     }
-    
-#         #     if ($PrintToFile) {
-#         #         $OutputMessage 
-#         #     }
-#         # }
-
-#         # end {
-
-#         # }
-#     }
