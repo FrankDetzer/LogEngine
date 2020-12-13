@@ -1,4 +1,45 @@
-﻿
+﻿function Initialize-Log {
+    param (
+        [string]$Name = 'UnnamedLog',
+        [string]$FilePath = $PSScriptRoot,
+        [bool]$OutputToFile = $true,
+        [bool]$OutputToConsole = $true
+    )
+
+    begin {
+        $FileName = $Name + '_' + (Get-Date -Format FileDateTimeUniversal) + '.log'
+
+        $global:LogObject = @()
+        $global:LogObject = [pscustomobject]@{
+            Meta = @(
+                [pscustomobject]@{
+                    FileName          = $FileName
+                    FilePath          = $FilePath + '\' + $FileName
+                    OutputToFile      = $OutputToFile
+                    OutputToConsole   = $OutputToConsole
+                    OutputFileCreated = $false
+                }
+            )
+            Data = @()            
+        }
+    }
+
+    process {
+        New-LogEntry -Prefix '#' -Message 'Inizalizing starting'
+        New-LogEntry -Prefix '#' -Message 'All date and time prints are in UTC, this includes the filename. The date is YYYY-MM-DD, the time is HH:MM:SS'
+        New-LogEntry -Prefix '#' -Message ('Computer: ' + $env:COMPUTERNAME)
+        New-LogEntry -Prefix '#' -Message ('User: ' + $env:USERNAME)
+        New-LogEntry -Prefix '#' -Message ('FullFilePath: ' + $global:LogObject.Meta.FullFilePath)
+        New-LogEntry -Prefix '#' -Message 'Inizalizing finished'                
+    }
+
+    end {
+        $global:LogObject.Data | Out-LogEntry
+        $global:LogObject.Meta.OutputFileCreated = Test-Path $global:LogObject.Meta.FullFilePath
+    }
+}
+
+
 
 function New-LogEntry {
     param (
@@ -6,32 +47,42 @@ function New-LogEntry {
         [string]$Message,
         [validateset('Info', 'Warn', 'Error', 'Debug')]
         [string]$Level = 'Info',
-        [bool]$PrintToOutput = $true,
-        [bool]$PrintToFile = $true
+        [bool]$PrintLineToOutput = $true,
+        [bool]$PrintLineToFile = $true,
+        [validateset($null, '#', '+', '-')]
+        [string]$Prefix = $null
 
     )
 
     begin {
-
+        if ($global:NewLogEntryTriggered -ne $true) {
+            [uint]$global:LogIndexCounter = 1
+            $global:NewLogEntryTriggered = $true
+        }
     }
 
     process {    
         $global:LogObject.Data += $CurrentMessge = @(
             [pscustomobject]@{
-                'TimeStamp'     = Get-Date -UFormat "%Y-%m-%d %T (UTC %Z)"
-                'Level'         = $Level
-                'Message'       = $Message
-                'PrintToOutput' = $PrintToOutput
-                'PrintToFile'   = $PrintToFile
+                'TimeStamp'         = Get-Date -UFormat "%Y-%m-%d %T (UTC %Z)"
+                'Index'             = "{0:d5}" -f $global:LogIndexCounter
+                'Prefix'            = $Prefix
+                'Level'             = $Level
+                'Message'           = $Message
+                # 'OutputMessage' = (("{0:d5}" -f $global:LogIndexCounter) + ' ' + $Prefix + ' ' + $Message)
+                'PrintLineToOutput' = $PrintLineToOutput
+                'PrintLineToFile'   = $PrintLineToFile
             }
         )
     }
 
     end {
+        $global:LogIndexCounter++
         $CurrentMessge | Out-LogEntry
     }
 
 }
+
 
 function Out-LogEntry {
     param (
@@ -40,62 +91,38 @@ function Out-LogEntry {
     )
 
     begin {
-        $LogFileCreated = 
-    }
-    
-    process {}
+        $Content | Select-Object -ExcludeProperty PrintLineToOutput, PrintLineToFile
 
-    end {}
+        if ($global:OutLogEntryTriggered -ne $true) {
 
-    $Content # | Format-Table -HideTableHeaders
-    $global:testcontent = $Content
+            if ($global:LogObject.Meta.OutputToFile) {
+                $Content | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8
+            }
 
-    # $OutputMessage = ($CurrentMessge | Format-Table -HideTableHeaders | Out-String).Trim()
-
-    # switch ($Level) {
-    #     'Info' { Write-Output $OutputMessage }
-    #     'Warn' { Write-Warning $OutputMessage }
-    #     'Error' { Write-Error $OutputMessage }
-    # }
-    
-    # if ($PrintToFile) {
-    #     $OutputMessage | Out-File -Path $global:LogObject.Meta.FullFilePath -Encoding UTF8 -Append
-    # }
-}
-
-function Initialize-Log {
-    param (
-        [string]$Name = 'UnnamedLog'
-    )
-    begin {
-        $global:LogObject = @()
-        $global:LogObject = [pscustomobject]@{
-            Meta = @(
-                [pscustomobject]@{
-                    FileName     = "$($Name)_$(Get-Date -Format FileDateTimeUniversal).log"
-                    FullFilePath = $PSScriptRoot + '.\' + $FileName
-                    FileCreated = $false
-                }
-            )
-            Data = @(
-                [pscustomobject]@{}
-            )            
+            $global:OutLogEntryTriggered = $true
         }
 
-        $LastLogMessage = $global:LogObject.Data | Select-Object -Last 1
-    }
 
-    process {
-        New-LogEntry -Level Info -PrintToOutput $true -PrintToFile $true -Message 'inizalizing starting'
-        New-LogEntry -Level Info -PrintToOutput $true -PrintToFile $true -Message 'all date and time prints are in UTC, this includes the filename.'
-        New-LogEntry -Level Info -PrintToOutput $true -PrintToFile $true -Message ('Computer: ' + $env:COMPUTERNAME)
-        New-LogEntry -Level Info -PrintToOutput $true -PrintToFile $true -Message ('User: ' + $env:USERNAME)
-        New-LogEntry -Level Info -PrintToOutput $true -PrintToFile $true -Message ('FullFilePath: ' + $global:LogObject.Meta.FullFilePath)
-        New-LogEntry -Level Info -PrintToOutput $true -PrintToFile $true -Message 'inizalizing finished'                
-    }
 
-    end {
-        $global:LogObject.Data | Select-Object TimeStamp, Level, Message | Out-File -Path $global:LogObject.Meta.FullFilePath -Encoding utf8
-        
-        $global:LogObject.Meta = Test-Path $global:LogObject.Meta.FullFilePath
+    #     $OutputMessage = ($Content | Format-Table -HideTableHeaders | Out-String).Trim()
+    # }
+    
+    # process {
+    #     Write-Information $OutputMessage
+    #     Write-Verbose $OutputMessage
+
+    #     switch ($Level) {
+    #         'Info' { Write-Output $OutputMessage }
+    #         'Warn' { Write-Warning $OutputMessage }
+    #         'Error' { Write-Error $OutputMessage }
+    #     }
+    
+    #     if ($PrintToFile) {
+    #         $OutputMessage 
+    #     }
+    # }
+
+    # end {
+
+    # }
 }
