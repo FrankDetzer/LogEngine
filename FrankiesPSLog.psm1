@@ -1,9 +1,9 @@
 ﻿function Initialize-Log {
     param (
         [string]$Name = 'UnnamedLog',
-        [string]$FilePath = $PSScriptRoot,
-        [bool]$OutputToFile = $true,
-        [bool]$OutputToConsole = $true
+        [string]$FilePath = (Get-Location).Path,
+        [bool]$OutputToFileEnabled = $true,
+        [bool]$OutputToConsoleEnabled = $true
     )
 
     begin {
@@ -13,11 +13,12 @@
         $global:LogObject = [pscustomobject]@{
             Meta = @(
                 [pscustomobject]@{
-                    FileName          = $FileName
-                    FilePath          = $FilePath + '\' + $FileName
-                    OutputToFile      = $OutputToFile
-                    OutputToConsole   = $OutputToConsole
-                    OutputFileCreated = $false
+                    FileName               = $FileName
+                    FilePath               = $FilePath
+                    FileLocation           = $FilePath + '\' + $FileName
+                    OutputToFileEnabled    = $OutputToFileEnabled
+                    OutputToConsoleEnabled = $OutputToConsoleEnabled
+                    OutputFileCreated      = $false
                 }
             )
             Data = @()            
@@ -29,13 +30,13 @@
         New-LogEntry -Prefix '#' -Message 'All date and time prints are in UTC, this includes the filename. The date is YYYY-MM-DD, the time is HH:MM:SS'
         New-LogEntry -Prefix '#' -Message ('Computer: ' + $env:COMPUTERNAME)
         New-LogEntry -Prefix '#' -Message ('User: ' + $env:USERNAME)
-        New-LogEntry -Prefix '#' -Message ('FullFilePath: ' + $global:LogObject.Meta.FullFilePath)
+        New-LogEntry -Prefix '#' -Message ('FilePath: ' + $global:LogObject.Meta.FileLocation)
         New-LogEntry -Prefix '#' -Message 'Inizalizing finished'                
     }
 
     end {
         $global:LogObject.Data | Out-LogEntry
-        $global:LogObject.Meta.OutputFileCreated = Test-Path $global:LogObject.Meta.FullFilePath
+        $global:LogObject.Meta.OutputFileCreated = Test-Path $global:LogObject.Meta.FileLocation
     }
 }
 
@@ -47,8 +48,8 @@ function New-LogEntry {
         [string]$Message,
         [validateset('Info', 'Warn', 'Error', 'Debug')]
         [string]$Level = 'Info',
-        [bool]$PrintLineToOutput = $true,
-        [bool]$PrintLineToFile = $true,
+        # [bool]$LineConsoleOutputEnabled = $true,
+        # [bool]$LineFileOutputEnabled = $true,
         [validateset($null, '#', '+', '-')]
         [string]$Prefix = $null
 
@@ -57,30 +58,49 @@ function New-LogEntry {
     begin {
         if ($global:NewLogEntryTriggered -ne $true) {
             [uint]$global:LogIndexCounter = 1
-            $global:NewLogEntryTriggered = $true
         }
     }
 
     process {    
-        $global:LogObject.Data += $CurrentMessge = @(
+        $global:LogObject.Data += $CurrentEntry = @(
             [pscustomobject]@{
-                'TimeStamp'         = Get-Date -UFormat "%Y-%m-%d %T (UTC %Z)"
-                'Index'             = "{0:d5}" -f $global:LogIndexCounter
-                'Prefix'            = $Prefix
-                'Level'             = $Level
-                'Message'           = $Message
-                # 'OutputMessage' = (("{0:d5}" -f $global:LogIndexCounter) + ' ' + $Prefix + ' ' + $Message)
-                'PrintLineToOutput' = $PrintLineToOutput
-                'PrintLineToFile'   = $PrintLineToFile
+                'TimeStamp' = Get-Date -UFormat "%Y-%m-%d %T (UTC %Z)"
+                'Index'     = "{0:d5}" -f $global:LogIndexCounter
+                'Prefix'    = $Prefix
+                'Level'     = $Level
+                'Message'   = $Message
+                # # 'OutputMessage' = (("{0:d5}" -f $global:LogIndexCounter) + ' ' + $Prefix + ' ' + $Message)
+                # 'LineConsoleOutputEnabled' = $LineConsoleOutputEnabled
+                # 'LineFileOutputEnabled'   = $LineFileOutputEnabled
             }
         )
     }
 
     end {
         $global:LogIndexCounter++
-        $CurrentMessge | Out-LogEntry
-    }
 
+        if ($global:NewLogEntryTriggered -ne $true) {
+            $global:NewLogEntryTriggered = $true
+        }
+
+        # $SanitisedEntry = $CurrentEntry | Select-Object -ExcludeProperty LineConsoleOutputEnabled, LineFileOutputEnabled
+
+        # # console output
+        # if ($global:LogObject.Meta.OutputToConsoleEnabled) {
+        #     if ($global:NewLogEntryTriggered -ne $true) {
+        #         $SanitisedEntry | Write-Output
+        #     }
+        #     $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Write-Output
+        # }
+        
+        # # file output
+        # if ($global:LogObject.Meta.OutputToFileEnabled) {
+        #     if ($global:NewLogEntryTriggered -ne $true) {
+        #         $SanitisedEntry | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8
+        #     }
+        #     $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8 -Append
+        # }
+    }
 }
 
 
@@ -91,38 +111,78 @@ function Out-LogEntry {
     )
 
     begin {
-        $Content | Select-Object -ExcludeProperty PrintLineToOutput, PrintLineToFile
-
-        if ($global:OutLogEntryTriggered -ne $true) {
-
-            if ($global:LogObject.Meta.OutputToFile) {
-                $Content | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8
+        $SanitisedEntry = $Content | Select-Object -ExcludeProperty LineConsoleOutputEnabled, LineFileOutputEnabled
+    }
+    
+    process {
+        # console output
+        if ($global:LogObject.Meta.OutputToConsoleEnabled) {
+            if ($global:OutLogEntryTriggered -ne $true) {
+                $SanitisedEntry | Write-Output
             }
+            $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Write-Output
+        }
+        
+        # file output
+        if ($global:LogObject.Meta.OutputToFileEnabled) {
+            # $OutputFile = New-Item -Path $global:LogObject.Meta.FilePath -Name $global:LogObject.Meta.FileName
 
+            if ($global:OutLogEntryTriggered -ne $true) {
+                $SanitisedEntry | Out-File -Path $global:LogObject.Meta.FileLocation -Encoding utf8
+            }
+            $SanitisedEntry = ($Content | Format-Table -HideTableHeaders | Out-String).Trim() | Out-File -Path $global:LogObject.Meta.FileLocation -Encoding utf8 -Append
+        }
+    }
+
+    end {
+        if ($global:OutLogEntryTriggered -ne $true) {
             $global:OutLogEntryTriggered = $true
         }
-
-
-
-    #     $OutputMessage = ($Content | Format-Table -HideTableHeaders | Out-String).Trim()
-    # }
-    
-    # process {
-    #     Write-Information $OutputMessage
-    #     Write-Verbose $OutputMessage
-
-    #     switch ($Level) {
-    #         'Info' { Write-Output $OutputMessage }
-    #         'Warn' { Write-Warning $OutputMessage }
-    #         'Error' { Write-Error $OutputMessage }
-    #     }
-    
-    #     if ($PrintToFile) {
-    #         $OutputMessage 
-    #     }
-    # }
-
-    # end {
-
-    # }
+    }
 }
+
+
+# function Out-LogEntry {
+#     param (
+#         [parameter(ValueFromPipeline)]
+#         [pscustomobject]$Content
+#     )
+
+#     begin {
+#         $SanitisedContent = $Content | Select-Object -ExcludeProperty LineConsoleOutputEnabled, LineFileOutputEnabled
+
+#         if ($global:OutLogEntryTriggered -ne $true) {
+
+#             if ($global:LogObject.Meta.OutputToFileEnabled) {
+#                 $SanitisedContent | Out-File -Path $global:LogObject.Meta.FilePath -Encoding utf8
+#             }
+
+#             $global:OutLogEntryTriggered = $true
+#         }
+
+#         if ($global:LogObject.Meta.)
+
+
+
+#         #     $OutputMessage = ($Content | Format-Table -HideTableHeaders | Out-String).Trim()
+#         # }
+    
+#         # process {
+#         #     Write-Information $OutputMessage
+#         #     Write-Verbose $OutputMessage
+
+#         #     switch ($Level) {
+#         #         'Info' { Write-Output $OutputMessage }
+#         #         'Warn' { Write-Warning $OutputMessage }
+#         #         'Error' { Write-Error $OutputMessage }
+#         #     }
+    
+#         #     if ($PrintToFile) {
+#         #         $OutputMessage 
+#         #     }
+#         # }
+
+#         # end {
+
+#         # }
+#     }
