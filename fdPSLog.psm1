@@ -5,7 +5,7 @@ $global:NewLogEntryTriggered = $false
 $global:OutLogEntryTriggered = $false
 
 
-function Initialize-Log {
+function Start-Log {
     param (
         [string]$Name = 'UnnamedLog',
         [string]$FilePath = (Get-Location).Path,
@@ -35,13 +35,13 @@ function Initialize-Log {
     }
 
     process {
-        New-LogEntry -Prefix '#' -Message 'Inizalizing starting'
-        New-LogEntry -Prefix '#' -Message 'All date and time prints are in UTC, this includes the filename. The date is YYYY-MM-DD, the time is HH:MM:SS'
-        New-LogEntry -Prefix '#' -Message ('Log Guid: ' + $LogGuid)
-        New-LogEntry -Prefix '#' -Message ('Computer: ' + $env:COMPUTERNAME)
-        New-LogEntry -Prefix '#' -Message ('User: ' + $env:USERNAME)
-        New-LogEntry -Prefix '#' -Message ('FilePath: ' + $global:LogObject.Meta.FileLocation)
-        New-LogEntry -Prefix '#' -Message 'Inizalizing finished'                
+        Add-Log -Prefix '#' -Message 'Inizalizing starting'
+        Add-Log -Prefix '#' -Message 'All date and time prints are in UTC, this includes the filename. The date is YYYY-MM-DD, the time is HH:MM:SS'
+        Add-Log -Prefix '#' -Message ('Log Guid: ' + $LogGuid)
+        Add-Log -Prefix '#' -Message ('Computer: ' + $env:COMPUTERNAME)
+        Add-Log -Prefix '#' -Message ('User: ' + $env:USERNAME)
+        Add-Log -Prefix '#' -Message ('FilePath: ' + $global:LogObject.Meta.FileLocation)
+        Add-Log -Prefix '#' -Message 'Inizalizing finished'                
     }
 
     end {
@@ -51,7 +51,7 @@ function Initialize-Log {
 
 
 
-function New-LogEntry {
+function Add-Log {
     param (
         [parameter(ValueFromPipeline)]
         [string]$Message,
@@ -127,4 +127,8 @@ function Out-LogEntry {
             $global:OutLogEntryTriggered = $true
         }
     }
+}
+
+function Stop-Log {
+    Add-Log -Prefix '#' -Message 'stopped loggin'
 }
