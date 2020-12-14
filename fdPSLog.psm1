@@ -10,18 +10,21 @@ function Start-Log {
         [string]$Name = 'UnnamedLog',
         [string]$FilePath = (Get-Location).Path,
         [bool]$OutputToFileEnabled = $true,
-        [bool]$OutputToConsoleEnabled = $true
+        [bool]$OutputToConsoleEnabled = $true,
+        [validateset('.log', '.txt')]
+        [string]$FileExtension = '.log'
+
     )
 
     begin {
         $LogGuid = (New-Guid).Guid
-        $FileName = $Name + '_' + (Get-Date -Format FileDateTimeUniversal) + '.log'
+        $FileName = $Name + '_' + (Get-Date -Format FileDateTimeUniversal) + $FileExtension
 
         $global:LogObject = @()
         $global:LogObject = [pscustomobject]@{
             Meta = @(
                 [pscustomobject]@{
-                    LogGuid = $LogGuid
+                    LogGuid                = $LogGuid
                     FileName               = $FileName
                     FilePath               = $FilePath
                     FileLocation           = $FilePath + '\' + $FileName
@@ -37,10 +40,11 @@ function Start-Log {
     process {
         Add-Log -Prefix '#' -Message 'Inizalizing starting'
         Add-Log -Prefix '#' -Message 'All date and time prints are in UTC, this includes the filename. The date is YYYY-MM-DD, the time is HH:MM:SS'
-        Add-Log -Prefix '#' -Message ('Log Guid: ' + $LogGuid)
-        Add-Log -Prefix '#' -Message ('Computer: ' + $env:COMPUTERNAME)
-        Add-Log -Prefix '#' -Message ('User: ' + $env:USERNAME)
-        Add-Log -Prefix '#' -Message ('FilePath: ' + $global:LogObject.Meta.FileLocation)
+        Add-Log -Prefix '#' -Message 'Output encoding is: UTF8'
+        Add-Log -Prefix '#' -Message ('Log Guid:           ' + $LogGuid)
+        Add-Log -Prefix '#' -Message ('Computer:           ' + $env:COMPUTERNAME)
+        Add-Log -Prefix '#' -Message ('User:               ' + $env:USERNAME)
+        Add-Log -Prefix '#' -Message ('FilePath:           ' + $global:LogObject.Meta.FileLocation)
         Add-Log -Prefix '#' -Message 'Inizalizing finished'                
     }
 
@@ -57,7 +61,7 @@ function Add-Log {
         [string]$Message,
         [validateset('Info', 'Warn', 'Error', 'Debug')]
         [string]$Level = 'Info',
-        [validateset($null, '#', '+', '-')]
+        [validateset($null, '#', '!', '?', '+', '-')]
         [string]$Prefix = $null
 
     )
@@ -83,12 +87,12 @@ function Add-Log {
 
     end {
         $global:LogIndexCounter++
-        Out-LogEntry -InputObject $CurrentEntry
+        Out-Log -InputObject $CurrentEntry
     }
 }
 
 
-function Out-LogEntry {
+function Out-Log {
     param (
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
         [pscustomobject[]]$InputObject
@@ -130,5 +134,5 @@ function Out-LogEntry {
 }
 
 function Stop-Log {
-    Add-Log -Prefix '#' -Message 'stopped loggin'
+    Add-Log -Prefix '#' -Message 'stopped logging'
 }
