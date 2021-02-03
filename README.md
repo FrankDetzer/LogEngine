@@ -1,2 +1,1 @@
-# FrankiesPSLog
- 
+please visit https://frankdetzer.com/why-i-wrote-a-power-shell-logengine-and-ended-up-not-using-it/ for more information. Thank you :) 
